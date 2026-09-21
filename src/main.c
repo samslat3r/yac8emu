@@ -5,10 +5,15 @@
 #include "memory.h"
 #include "logger.h"
 #include "sdl_wrapper.h"
+#include "timer.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
+// CHIP-8 delay/sound timers must decrement at a fixed 60Hz, independent of
+// how fast instructions execute.
+#define TIMER_INTERVAL_MS (1000 / 60)
 
 void cleanup() {	
 	destroyGraphics();
@@ -64,6 +69,7 @@ int main(int argc, char **argv) {
 	
 	bool running = true;
 	uint32_t lastCycleTime = SDL_GetTicks();
+	uint32_t lastTimerTime = SDL_GetTicks();
 	while (running) {
 		handleInput(&chip8, &running);
 
@@ -71,10 +77,18 @@ int main(int argc, char **argv) {
 		executeCycle(&chip8);
 
 		//Render if needed
-		
+
 		if (chip8.drawFlag) {
 			renderGraphics(&chip8);
 			chip8.drawFlag = false;
+		}
+
+		// Delay/sound timers tick at a fixed 60Hz, independent of how many
+		// instructions ran in between.
+		uint32_t nowForTimer = SDL_GetTicks();
+		if (nowForTimer - lastTimerTime >= TIMER_INTERVAL_MS) {
+			updateTimers(&chip8);
+			lastTimerTime = nowForTimer;
 		}
 
 		// Delay to control emulation speed

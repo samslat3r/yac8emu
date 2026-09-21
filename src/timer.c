@@ -9,11 +9,13 @@ void updateTimers(chip8_t *chip8) {
 		chip8->delay_timer--;
 	}
 
-	// Decrement sound timer if > 0 and playSound() if = 0
+	// Decrement sound timer if > 0, then play while it is still counting
 	if (chip8->sound_timer > 0) {
 		chip8->sound_timer--;
 	}
-	if (chip8->sound_timer == 0) {
+	if (chip8->sound_timer > 0) {
 		playSound();
+	} else {
+		stopSound();
 	}
 }

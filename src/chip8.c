@@ -81,7 +81,8 @@ uint16_t fetchOpcode(chip8_t *chip8) {
 void executeCycle(chip8_t *chip8) {
     chip8->opcode = fetchOpcode(chip8);
     decodeAndExecute(chip8, chip8->opcode);
-    updateTimers(chip8);
+    // Timers are NOT updated here: they must tick at a fixed 60Hz, not once
+    // per instruction. See updateTimers() calls in main.c's loop.
 }
 
 void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
@@ -109,6 +110,10 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                     break;
 
                 case 0x00EE: // 00EE Return from a subroutine
+                    if (chip8->SP == 0) { // Nothing on the stack to return to
+                        printf("Stack underflow: RET with empty call stack\n");
+                        exit(1);
+                    }
                     chip8->SP--; // Decrement stack pointer
                     chip8->PC = chip8->stack[chip8->SP]; // Move to address at top of stack
                     chip8->PC += 2; // Move to next instruction
@@ -125,6 +130,10 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
             break;
 
         case 0x2000: // 2NNN - Call subroutine at NNN
+            if (chip8->SP >= CHIP8_STACK_SIZE) { // No room left on the stack
+                printf("Stack overflow: call depth exceeded %d\n", CHIP8_STACK_SIZE);
+                exit(1);
+            }
             chip8->stack[chip8->SP] = chip8->PC; // Store current PC on stack
             chip8->SP++; // Increment stack pointer
             chip8->PC = opcode & 0x0FFF; // Jump to subroutine at NNN
@@ -154,7 +163,7 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                 break;
 
             case 0x6000: // 6XNN : Set VX to NN
-                chip8->V[(opcode & 0x0F00) >> 8] = chip8->V[(opcode & 0x00FF)]; // Set register VX to NN
+                chip8->V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF; // Set register VX to NN
                 chip8->PC += 2; // Move to next instruction
                 break;
             
@@ -172,31 +181,32 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                         break;
 
                         case 0x0001: // 8XY1 : Set VX to bitwise VX OR VY
-                            chip8->V[(opcode & 0x0F00) >> 8] |= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
+                            chip8->V[(opcode & 0x0F00) >> 8] |= chip8->V[(opcode & 0x00F0) >> 4]; // VX |= VY
                             chip8->PC += 2; // Move to next instruction
                             break;
-                        
+
                         case 0x0002: // 8XY2 : Set VX to bitwise VX AND VY
-                            chip8->V[(opcode & 0x0F00) >> 8] &= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
+                            chip8->V[(opcode & 0x0F00) >> 8] &= chip8->V[(opcode & 0x00F0) >> 4]; // VX &= VY
                             chip8->PC += 2; // Move to next instruction
                             break;
 
                         case 0x0003: // 8XY2 : Set VX to bitwise VX XOR VY
-                            chip8->V[(opcode & 0x0F00) >> 8] ^= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
+                            chip8->V[(opcode & 0x0F00) >> 8] ^= chip8->V[(opcode & 0x00F0) >> 4]; // VX ^= VY
                             chip8->PC += 2; // Move to next instruction
                             break;
 
-                        case 0x0004: // 8XY4: Add VY to VX, set VF on carry
-                            if (chip8->V[(opcode & 0x00F0) >> 4] > (0xFF - chip8->V[(opcode & 0xF00) >> 8])) {
-                                chip8->V[0xF] = 1; // Carry flag set to 1 if there is an overflow
-                            } else {
-                                chip8->V[0xF] = 0; // No carry
-                            }
+                        case 0x0004: { // 8XY4: Add VY to VX, set VF on carry
+                            uint8_t x = (opcode & 0x0F00) >> 8;
+                            uint8_t y = (opcode & 0x00F0) >> 4;
+                            uint8_t carry = (chip8->V[y] > (0xFF - chip8->V[x])) ? 1 : 0;
+                            chip8->V[x] += chip8->V[y]; // VX += VY
+                            chip8->V[0xF] = carry; // Carry flag set after the add, so it wins if X == 0xF
+                            chip8->PC += 2; // Move to next instruction
                             break;
-                        
+                        }
+
                         case 0x0005:  // 8XY5 : Subtract VY from VX, set VF if no borrow
-                            // some turmoil occured here
-                            if (chip8->V[(opcode & 0x00F0) >> 4] > chip8->V[(opcode & 0x0F00 >> 8)]) {
+                            if (chip8->V[(opcode & 0x00F0) >> 4] > chip8->V[(opcode & 0x0F00) >> 8]) {
                                 chip8->V[0xF] = 0; // Borrow occured
                             } else {
                                 chip8->V[0xF] = 1; // No borrow
@@ -204,7 +214,6 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                             chip8->V[(opcode & 0x0F00) >> 8] -= chip8->V[(opcode & 0x00F0) >> 4]; //VX -= VY
                             chip8->PC += 2; // Move to next instruction
                             break;
-                        break;
 
                     case 0x0006: // 8XY6 Store least significant bit of VX in VF, then shift VX to the right by 1
                         chip8->V[0xF] = chip8->V[(opcode & 0x0F00) >> 8] & 0x1; // Store least significant bit of VX in VF
@@ -235,11 +244,23 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                 }
                 break;
             
+            case 0x9000: // 9XY0 : Skip next instruction if VX != VY
+                if (chip8->V[(opcode & 0x0F00) >> 8] != chip8->V[(opcode & 0x00F0) >> 4]) {
+                    chip8->PC += 4; // Skip the next instruction
+                } else {
+                    chip8->PC += 2; // Move to next instruction
+                }
+                break;
+
             case 0xA000: // ANNN : Set I to address NNN
                 chip8->I = opcode & 0x0FFF; // Set I to address NNN
                 chip8->PC += 2; // Move to next instruction
                 break;
-            
+
+            case 0xB000: // BNNN : Jump to address NNN + V0
+                chip8->PC = (opcode & 0x0FFF) + chip8->V[0]; // No PC += 2, PC is set directly
+                break;
+
             case 0xC000: // CXXN: Set VX to random byte AND NN
                 chip8->V[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF); // VX = random byte AND NN
                 chip8->PC += 2;

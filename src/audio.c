@@ -33,7 +33,7 @@ void audioCallback(void *userdata, uint8_t *stream, int len) {
 	for (int i = 0; i < samples; i++) {
 		//Generate a square wave using the sign of sine function
 		float sampleValue = (sin(phase) > 0.0) ? AMPLITUDE : -AMPLITUDE;
-		buffer[i] = sampleValue;
+		buffer[i] = (int16_t)(sampleValue * INT16_MAX);
 		phase += phaseIncrement;
 
 		//Wrap phase to [0, 2PI) to avoid overflow
