@@ -238,10 +238,22 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                 }
                 break;
             
+            // Previously missing 
+	    case 0x9000: // 9XY0: skip if VX != VY
+		if ((opcode & 0x000F) != 0) {
+			cpuFault(chip8, "Invalid 9XY0 opcode"); //cpuFault to be added later; a low nibble check
+		}
+		break;
+
             case 0xA000: // ANNN : Set I to address NNN
                 chip8->I = opcode & 0x0FFF; // Set I to address NNN
                 chip8->PC += 2; // Move to next instruction
                 break;
+
+	    // Previously missing
+	    case 0xB000: //BNNN: PC = NNN + V0
+		chip8->PC = nnn + chip8->V[0];
+		break;
             
             case 0xC000: // CXXN: Set VX to random byte AND NN
                 chip8->V[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF); // VX = random byte AND NN
@@ -284,7 +296,7 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                 }
                 break;
             
-            case 0xF000:
+           case 0xF000:
             // Handle timers, memory, input
             switch (opcode & 0x00FF) {
                 case 0x0007: // FX07 : Set VX to value of delay timer
@@ -325,6 +337,14 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                     chip8->I += chip8->V[(opcode & 0x0F00) >> 8]; // Add VX to I
                     chip8->PC += 2; // Move to next instruction
                     break;
+ 
+		case 0x0029: //FX20: I = address of sprite
+		    if (chip8->V[x] > 0x0F) {
+			    cpuFault(chip8, "Font digit must be between 0 and F");
+		    }	    
+		    chip8->I = CHIP8_FONTSET_START_ADDRESS + 5 * chip8->V[x];
+		    chip8->PC += 2;
+		    break;
                 
                 case 0x0033: // FX33 : Store BCD representation of VX in memory locations I, I+1, I+2
                     chip8->memory[chip8->I] = chip8->V[(opcode & 0x0F00) >> 8] / 100; // Hundreds digit
