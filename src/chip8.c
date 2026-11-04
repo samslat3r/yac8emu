@@ -131,6 +131,7 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
             chip8->SP++; // Increment stack pointer
             chip8->PC = opcode & 0x0FFF; // Jump to subroutine at NNN
             break;
+
         case 0x3000: // 3XNN - Skip next instruction if VX == NN
             if (chip8->V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF)) {
                 chip8->PC += 4; // Skip the next instruction
@@ -139,26 +140,26 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
             }
             break;
 
-            case 0x4000: // 4XNN - Skip next instruction if VX != NN
-                if (chip8->V[(opcode & 0xF00) >> 8] != (opcode & 0x00FF)) {
-                    chip8->PC += 4; // Skip the next instruction
-                } else {
-                    chip8->PC += 2; // Move to next instruction
-                }
-                break;
-            
-            case 0x5000: // 5XY0: Skip next instruction if VX == VY
-                if (chip8->V[(opcode & 0x0F00) >> 8] == chip8->V[(opcode & 0x00F0) >> 4]) {
-                    chip8->PC += 4; // Skip the next instruction
-                } else {
-                    chip8->PC += 2; // Move to next instruction
-                }
-                break;
-
-            case 0x6000; // 6XNN : VX = NN
-                chip8->V[x] = nn; // Set VX to NN
+        case 0x4000: // 4XNN - Skip next instruction if VX != NN
+            if (chip8->V[(opcode & 0xF00) >> 8] != (opcode & 0x00FF)) {
+                chip8->PC += 4; // Skip the next instruction
+            } else {
                 chip8->PC += 2; // Move to next instruction
-                break;
+            }
+            break;
+            
+        case 0x5000: // 5XY0: Skip next instruction if VX == VY
+            if (chip8->V[(opcode & 0x0F00) >> 8] == chip8->V[(opcode & 0x00F0) >> 4]) {
+                chip8->PC += 4; // Skip the next instruction
+            } else {
+                chip8->PC += 2; // Move to next instruction
+            }
+            break;
+
+        case 0x6000: // 6XNN : VX = NN
+            chip8->V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF; // Set VX to NN
+            chip8->PC += 2; // Move to next instruction
+            break;
             
             case 0x7000: // 7XNN : Add NN to VX
                 chip8->V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF; // Add NN to VX
@@ -172,21 +173,21 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                         chip8->V[(opcode & 0x0F00) >> 8] = chip8->V[(opcode & 0x00F0) >> 4]; // VX=VY
                         chip8->PC += 2; // Move to next instruction
                         break;
-
-                        case 0x0001: // 8XY1 : Set VX to bitwise VX OR VY
-                            chip8->V[(opcode & 0x0F00) >> 8] |= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
-                            chip8->PC += 2; // Move to next instruction
-                            break;
-                        
-                        case 0x0002: // 8XY2 : Set VX to bitwise VX AND VY
-                            chip8->V[(opcode & 0x0F00) >> 8] &= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
-                            chip8->PC += 2; // Move to next instruction
-                            break;
-
-                        case 0x0003: // 8XY2 : Set VX to bitwise VX XOR VY
-                            chip8->V[(opcode & 0x0F00) >> 8] ^= chip8->V[(opcode & 0x0F00) >> 4]; // VX |= VY
-                            chip8->PC += 2; // Move to next instruction
-                            break;
+                    
+                    case 0x0001: // 8XY1: VX |= VY
+                        chip8->V[x] |= chip8->V[y] // VX = VX OR VY
+                        chip8->PC += 2; // Move to next instruction
+                        break;
+                    
+                    case 0x0002: // 8XY2; VX &= VY
+                        chip8->V[x] &= chip8->V[y]; // VX = VX AND VY
+                        chip8->PC += 2; // Move to next instruction
+                        break;
+                    
+                    case 0x0003: // 8XY3: VX ^= VY
+                        chip8->V[x] ^= chip8->V[y]; // VX = VX XOR VY
+                        chip8->PC += 2; // Move to next instruction
+                        break;
 
                         case 0x0004: { // 8XY4: VX += VY, VF = carry
                             uint16_t sum = (uint16_t)chip8->V[x] + chip8->V[y]; // Sum of VX and VY
