@@ -188,13 +188,13 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
                             chip8->PC += 2; // Move to next instruction
                             break;
 
-                        case 0x0004: // 8XY4: Add VY to VX, set VF on carry
-                            if (chip8->V[(opcode & 0x00F0) >> 4] > (0xFF - chip8->V[(opcode & 0xF00) >> 8])) {
-                                chip8->V[0xF] = 1; // Carry flag set to 1 if there is an overflow
-                            } else {
-                                chip8->V[0xF] = 0; // No carry
-                            }
+                        case 0x0004: { // 8XY4: VX += VY, VF = carry
+                            uint16_t sum = (uint16_t)chip8->V[x] + chip8->V[y]; // Sum of VX and VY
+                            chip8->V[x] = (uint8_t)sum; // Store lower 8 bits in VX
+                            chip8->V[0xF] = sum > 0xFF; // Set VF to 1 if there's a carry, else 0
+                            chip8->PC += 2; // Move to next instruction
                             break;
+                        }
                         
                         case 0x0005:  // 8XY5 : Subtract VY from VX, set VF if no borrow
                             // some turmoil occured here
