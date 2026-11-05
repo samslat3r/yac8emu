@@ -79,9 +79,8 @@ uint16_t fetchOpcode(chip8_t *chip8) {
 }
 
 void executeCycle(chip8_t *chip8) {
-    chip8->opcode = fetchOpcode(chip8);
-    decodeAndExecute(chip8, chip8->opcode);
-    updateTimers(chip8);
+	chip8->opcode = fetchOpcode(chip8);
+	decodeAndExecute(chip8, chip8->opcode);
 }
 
 // Fix: introduce decoded instruction fields 
