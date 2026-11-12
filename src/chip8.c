@@ -174,10 +174,8 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       chip8->PC += 2;                       // Move to next instruction
       break;
 
-    case 0x0001: // 8XY1: VX |= VY
-      chip8->V[x] |= chip8
-                         ->V[y]      // VX = VX OR VY
-                     chip8->PC += 2; // Move to next instruction
+    case 0x0001:                           // 8XY1: VX |= VY
+      chip8->V[x] |= chip8 chip8->PC += 2; // Move to next instruction
       break;
 
     case 0x0002:                  // 8XY2; VX &= VY
@@ -198,18 +196,14 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       break;
     }
 
-    case 0x0005: // 8XY5 : Subtract VY from VX, set VF if no borrow
-      // some turmoil occured here
-      if (chip8->V[(opcode & 0x00F0) >> 4] > chip8->V[(opcode & 0x0F00 >> 8)]) {
-        chip8->V[0xF] = 0; // Borrow occured
-      } else {
-        chip8->V[0xF] = 1; // No borrow
-      }
-      chip8->V[(opcode & 0x0F00) >> 8] -=
-          chip8->V[(opcode & 0x00F0) >> 4]; // VX -= VY
-      chip8->PC += 2;                       // Move to next instruction
+    case 0x0005: { // 8XY5 : VX = VX - VY
+      uint8_t vx = chip8->V[x];
+      uint8_t vy = chip8->V[y];
+      chip8->V[x] = (uint8_t)(vx - vy);
+      chip8->V[0xF] = vx >= vy;
+      chip8->PC += 2;
       break;
-      break;
+    }
 
     case 0x0006: // 8XY6 Store least significant bit of VX in VF, then shift VX
                  // to the right by 1
