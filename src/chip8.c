@@ -205,33 +205,30 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       break;
     }
 
-    case 0x0006: // 8XY6 Store least significant bit of VX in VF, then shift VX
-                 // to the right by 1
-      chip8->V[0xF] = chip8->V[(opcode & 0x0F00) >> 8] &
-                      0x1; // Store least significant bit of VX in VF
-      chip8->V[(opcode & 0x0F00) >> 8] >>= 1; // Shift VX to the right by 1
-      chip8->PC += 2;                         // Move to next instruction
+    case 0x0006: { // 8XY6: Shift VX right
+      uint8_t vx = chip8->V[x];
+      chip8->V[x] = vx >> 1;
+      chip8->V[0xF] = vx & 1;
+      chip8->PC += 2;
       break;
+    }
 
-    case 0x0007: // 8XY7 : Set VX to VY - VX, set VF if no borrow
-      if (chip8->V[(opcode & 0x0F00) >> 8] > chip8->V[(opcode & 0x00F0) >> 4]) {
-        chip8->V[0xF] = 0; // Borrow occured
-      } else {
-        chip8->V[0xF] = 1; // No borrow
-      }
-      chip8->V[(opcode & 0x0F00) >> 8] =
-          chip8->V[(opcode & 0x00F0) >> 4] -
-          chip8->V[(opcode & 0x0F00) >> 8]; // VX = VY - VX
-      chip8->PC += 2;                       // Move to next instruction
+    case 0x0007: { // 8XY7: VX = VY - VX
+      uint8_t vx = chip8->V[x];
+      uint8_t vy = chip8->V[y];
+      chip8->V[x] = (uint8_t)(vy - vx);
+      chip8->V[0xF] = vy >= vx;
+      chip8->PC += 2;
       break;
+    }
 
-    case 0x000E: // 8XYE: Store most significant bit of VX in VF, then shift VX
-                 // to the left by 1
-      chip8->V[0xF] = chip8->V[(opcode & 0x0F00) >> 8] >>
-                      7; // Store most significant bit of VX in VF
-      chip8->V[(opcode & 0x0F00) >> 8] <<= 1; // Shift VX to the left by 1
-      chip8->PC += 2;                         // Move to next instruction
+    case 0x000E: { // 8XYE: shift VX  Left
+      uint8_t vx = chip8->V[x];
+      chip8->V[x] = (uint8_t)(vx << 1);
+      chip8->V[0xF] = vx >> 7;
+      chip8->PC += 2;
       break;
+    }
 
     default:
       printf("Unknown opcode: %X\n", opcode);
