@@ -73,6 +73,13 @@ void initializeCPU(chip8_t *chip8) {
   srand((unsigned int)time(NULL));
 }
 
+static void cpuFault(const chip8_t *chip8, const char *message) {
+  fprintf(stderr, "CHIP-8 fault at PC=0x%04X: %s\n", (unsigned)chip8->PC,
+          message);
+  logError("CHIP-8 fault at PC=0%04X: %s", (unsigned)chip8->PC, message);
+  exit(EXIT_FAILURE);
+}
+
 uint16_t fetchOpcode(chip8_t *chip8) {
   return (chip8->memory[chip8->PC] << 8) | chip8->memory[chip8->PC + 1];
 }
@@ -109,10 +116,12 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       chip8->PC += 2;         // Move to next instruction
       break;
 
-    case 0x00EE:                           // 00EE Return from a subroutine
-      chip8->SP--;                         // Decrement stack pointer
-      chip8->PC = chip8->stack[chip8->SP]; // Move to address at top of stack
-      chip8->PC += 2;                      // Move to next instruction
+    case 0x00EE: // 00EE Return from a subroutine
+      if (chip8->SP == 0 || chip8->SP > CHIP8_STACK_SIZE) {
+        cpuFault(chip8, "Invalid stack pointer on return");
+      }
+      chip8->SP--;
+      chip8->PC = chip8->stack[chip8->SP] + 2;
       break;
 
     default:
@@ -125,10 +134,13 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
     chip8->PC = opcode & 0x0FFF; // Set PC to address NNN
     break;
 
-  case 0x2000:                           // 2NNN - Call subroutine at NNN
-    chip8->stack[chip8->SP] = chip8->PC; // Store current PC on stack
-    chip8->SP++;                         // Increment stack pointer
-    chip8->PC = opcode & 0x0FFF;         // Jump to subroutine at NNN
+  case 0x2000: // 2NNN - Call subroutine at NNN
+    if (chip8->SP >= CHIP8_StACK_SIZE) {
+      cpuFault(chip8, "Stack overflow");
+    }
+    chip8->stack[chip8->SP] = chip8 - PC;
+    chip->SP++;
+    chip8->PC = nnn;
     break;
 
   case 0x3000: // 3XNN - Skip next instruction if VX == NN
