@@ -80,8 +80,13 @@ static void cpuFault(const chip8_t *chip8, const char *message) {
   exit(EXIT_FAILURE);
 }
 
+static void requireMemoryRange(const chip8_t *chip8, uint16_6 address,
+                               size_t count) {}
+
 uint16_t fetchOpcode(chip8_t *chip8) {
-  return (chip8->memory[chip8->PC] << 8) | chip8->memory[chip8->PC + 1];
+  requireMemoryRange(chip8, chip8->PC, 2);
+  return ((uint16_t)chip8->memory[chip8->PC] << 8) |
+         chip8->memory[chip8->PC + 1];
 }
 
 void executeCycle(chip8_t *chip8) {
@@ -274,38 +279,41 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
     break;
 
   case 0xD000: { // DXYN : Displays N-byte sprite starting at memory address I
-                 // at (VX, VY), set VF = collision
-    uint8_t x = chip8->V[(opcode & 0xF00) >> 8]; // X-coordinate from VX
-    uint8_t y = chip8->V[(opcode & 0x0F0) >> 4]; // Y-coordinate from VY
-    uint8_t height = opcode & 0x000F; // Height (N bytes) from the last nibble
-    const uint8_t *sprite =
-        &chip8->memory[chip8->I]; // Sprite draw starting at memory address I
-    chip8->V[0xF] = drawSprite(chip8, x, y, sprite, height)
-                        ? 1
-                        : 0; // Set VF to 1 if collision
-    chip8->drawFlag = true;  // Set draw flag to redraw screen
-    chip8->PC += 2;          // Move to next instruction
-  } break;
+                 // at (VX, VY), set V0xF = collision
+    uint8_t spriteX = chip8->V[x];
+    uint8_t spriteY = chip8->V[y];
+    uint8_t height = opcode & 0x000F;
+    requireMemoryRange(chip8, chip8->I, height);
+    const uint8_t *sprite = &chip8->memory[chip8->I];
+    chip8->V[0xF] = drawSprite(chip8, spriteX, spriteY, sprite, height);
+    chip8->drawFlag = true;
+    chip8->PC += 2;
+    break;
+  }
 
   case 0xE000:
     // Opcodes below handle key press events
     switch (opcode & 0x00FF) {
-    case 0x009E: // EX9E : Skip next instruction if key stored in VX is pressed
-      if (chip8->keypad[chip8->V[(opcode & 0x0F00) >> 8]]) {
-        chip8->PC += 4; // skip next instruction
-      } else {
-        chip8->PC += 2; // Move to next instruction
-      }
-      break;
 
-    case 0x00A1: // EXA1 : Skip next instruction if key stored in VX is not
-                 // pressed
-      if (!chip8->keypad[chip8->V[(opcode & 0x0F00) >> 8]]) {
-        chip8->PC += 4; // Skip next instruction
-      } else {
-        chip8->PC += 2; // Move to next instruction
+    case 0x009E: { // EX9E : Skip next instruction if key stored in VX is
+                   // pressed
+      uint8_t key = chip8->V[x];
+      if (key >= CHIP8_NUM_KEYS) {
+        cpuFault(chip8, "Invalid keypad index");
       }
+      chip8->PC += 2;
       break;
+    }
+
+    case 0x00A1: { // EXA1 : Skip next instruction if key stored in VX is not
+                   // pressed
+      uint8_t key = chip8->V[x];
+      if (key >= CHIP8_NUM_KEYS) {
+        cpuFault(chip8, "Invalid keypad index");
+      }
+      chip8->PC += !chip8->keypad[key] ? 4 : 2;
+      break;
+    }
 
     default:
       printf("Unknown opcode: 0x%X\n", opcode);
