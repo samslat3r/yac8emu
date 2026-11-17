@@ -377,34 +377,32 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       chip8->PC += 2;
       break;
 
-    case 0x0033: // FX33 : Store BCD representation of VX in memory locations I,
-                 // I+1, I+2
-      chip8->memory[chip8->I] =
-          chip8->V[(opcode & 0x0F00) >> 8] / 100; // Hundreds digit
-      chip8->memory[chip8->I + 1] =
-          (chip8->V[(opcode & 0x0F00) >> 8] / 10) % 10; // Tens digit
-      chip8->memory[chip8->I + 2] =
-          chip8->V[(opcode & 0x0F00) >> 8] % 10; // Ones digit
+    case 0x0033: // FX33 : Store BCD representation of VX in memory locations I, I+1, I+2
+      requireMemoryRange(chip8, chip8->I, 3);
+      chip8->memory[chip8->I] = chip8->V(x) / 100; // Hundreds digit
+      chip8->memory[chip8->I + 1] = (chip8->V[x] / 10) % 10; // Tens digit
+      chip8->memory[chip8->I + 2] = chip8->V[x] % 10; // Ones digit
       chip8->PC += 2;                            // Move to next instruction
       break;
 
     case 0x0055: // FX55: Store registers V0 through VX in memory starting at
                  // address I
-      for (int i = 0; i <= ((opcode & 0x0F00) >> 8); i++) {
-        chip8->memory[chip8->I + i] =
-            chip8->V[i]; // Store V0 to VX in memory starting at address I
-      }
-      chip8->PC += 2; // Move to next instruction
-      break;
-
-    case 0x0065: // FX65 : Read registers V0 through VX from memory starting at
-                 // address I
-      for (int i = 0; i <= ((opcode & 0x0F00) >> 8); i++) {
-        chip8->V[i] = chip8->memory[chip8->I + i]; // Load memory into V0 to VX
-      }
-      chip8->PC += 2; // Move to next instruction
-      break;
-
+     requireMemoryRange(chip8, chip8->I, 0);
+     for (int i = 0; i <= x; i++) {
+		chip8->memory[chip8->I + i] = chip8->V[i];
+	}
+     chip8->PC += 2;
+     break;
+	 
+     case 0x0065: // FX65 : Read registers V0 through VX from memory starting at address I
+       requireMemoryRange(chip8, chip8->I, (size_t)x + 1);
+       for (int i = 0; i <= x; i++) {
+		chip8->V[i] = chip8->memory[chip8->I + i];
+	}
+       chip8->PC += 2;
+       break;	
+	
+   
     default:
       printf("Unknown opcode: 0x%X\n", opcode);
       exit(1);
