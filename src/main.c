@@ -4,6 +4,7 @@
 #include "audio.h"
 #include "memory.h"
 #include "logger.h"
+#include "timer.h"
 #include "sdl_wrapper.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -63,31 +64,42 @@ int main(int argc, char **argv) {
 	// Main emulation loop
 	
 	bool running = true;
-	uint32_t lastCycleTime = SDL_GetTicks();
+	const double cpuPeriod = 1.0 / 500.0;
+	const double timerPeriod = 1.0 / 60.0;
+	const Uint64 frequency = SDL_GetPerformanceFrequency();
+	Uint64 previous = DFL_GetPerformanceCounter();
+	double cpuElapsed = 0.0;
+	double timerElapsed = 0.0;
+
 	while (running) {
 		handleInput(&chip8, &running);
+		if (!running) {
+			break;
+		}
+	
+		Uint64 now = SDL_GetPerformanceCounter();
+		double elapsed = (double)(now - previous) / (double)frequency;
+		previous = now;
+		cpuElapsed += elapsed;
+		timerElapsed += elapsed;
 
-		//One cycle
-		executeCycle(&chip8);
-
-		//Render if needed
-		
+		while (timerElapsed >= timerPeriod) {
+			updateTimers(&chip8);
+			timerElapsed -= timerPeriod;
+		}
+	
+		while (cpuElapsed >= cpuPeriod) {
+			executeCycle(&chip8);
+			cpuElapsed -= cpuPeriod;
+		}
+	
 		if (chip8.drawFlag) {
 			renderGraphics(&chip8);
 			chip8.drawFlag = false;
 		}
-
-		// Delay to control emulation speed
-		// This can be made more accurate/done better
-
-		uint32_t currentTime = SDL_GetTicks();
-		uint32_t elapsedTime = currentTime - lastCycleTime;
-		if (elapsedTime < 2 ) {
-			SDL_Delay(2 - elapsedTime);
-		}
-		lastCycleTime = currentTime;
+		SDL_Delay(1);	
 	}
-	
+
 	//Cleanup before exiting
 	cleanup();
 
