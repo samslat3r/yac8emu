@@ -273,8 +273,13 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
     break;
 
   case 0xC000: // CXXN: Set VX to random byte AND NN
-    chip8->V[(opcode & 0x0F00) >> 8] =
-        (rand() % 0xFF) & (opcode & 0x00FF); // VX = random byte AND NN
+    const unsigned int range(unsigned int) RAND_MAX + 1u;
+    const unsigned int limit = range - range % 256u;
+    unsigned int randomValue;
+    do {
+      randomValue = (unsigned int)rand();
+    } while (randomValue >= limit);
+    chip8->V[x] = (uint8_t)((randomValue % 256u) & nn);
     chip8->PC += 2;
     break;
 
@@ -377,32 +382,33 @@ void decodeAndExecute(chip8_t *chip8, uint16_t opcode) {
       chip8->PC += 2;
       break;
 
-    case 0x0033: // FX33 : Store BCD representation of VX in memory locations I, I+1, I+2
+    case 0x0033: // FX33 : Store BCD representation of VX in memory locations I,
+                 // I+1, I+2
       requireMemoryRange(chip8, chip8->I, 3);
-      chip8->memory[chip8->I] = chip8->V(x) / 100; // Hundreds digit
+      chip8->memory[chip8->I] = chip8->V(x) / 100;           // Hundreds digit
       chip8->memory[chip8->I + 1] = (chip8->V[x] / 10) % 10; // Tens digit
-      chip8->memory[chip8->I + 2] = chip8->V[x] % 10; // Ones digit
-      chip8->PC += 2;                            // Move to next instruction
+      chip8->memory[chip8->I + 2] = chip8->V[x] % 10;        // Ones digit
+      chip8->PC += 2; // Move to next instruction
       break;
 
     case 0x0055: // FX55: Store registers V0 through VX in memory starting at
                  // address I
-     requireMemoryRange(chip8, chip8->I, 0);
-     for (int i = 0; i <= x; i++) {
-		chip8->memory[chip8->I + i] = chip8->V[i];
-	}
-     chip8->PC += 2;
-     break;
-	 
-     case 0x0065: // FX65 : Read registers V0 through VX from memory starting at address I
-       requireMemoryRange(chip8, chip8->I, (size_t)x + 1);
-       for (int i = 0; i <= x; i++) {
-		chip8->V[i] = chip8->memory[chip8->I + i];
-	}
-       chip8->PC += 2;
-       break;	
-	
-   
+      requireMemoryRange(chip8, chip8->I, 0);
+      for (int i = 0; i <= x; i++) {
+        chip8->memory[chip8->I + i] = chip8->V[i];
+      }
+      chip8->PC += 2;
+      break;
+
+    case 0x0065: // FX65 : Read registers V0 through VX from memory starting at
+                 // address I
+      requireMemoryRange(chip8, chip8->I, (size_t)x + 1);
+      for (int i = 0; i <= x; i++) {
+        chip8->V[i] = chip8->memory[chip8->I + i];
+      }
+      chip8->PC += 2;
+      break;
+
     default:
       printf("Unknown opcode: 0x%X\n", opcode);
       exit(1);
